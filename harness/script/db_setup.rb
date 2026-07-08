@@ -15,7 +15,7 @@ raise "Could not find solid_queue queue_schema.rb (looked in: #{schema_candidate
 load queue_schema
 
 ActiveRecord::Schema.define do
-  create_table :bench_events, if_not_exists: true do |t|
+  create_table :bench_events, force: true do |t|
     t.string :job_id, null: false
     t.string :job_class, null: false
     t.string :queue_name
