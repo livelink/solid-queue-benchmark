@@ -34,6 +34,12 @@ class ProfileTest < Minitest::Test
     )
   end
 
+  def test_loads_profile_by_path
+    p = Bench::Profile.load("profiles/smoke.yml")
+    assert_equal 2, p.workers
+    assert_equal "smoke", p.name
+  end
+
   def test_expected_process_count
     p = Bench::Profile.load("default")
     assert_equal 12, p.expected_process_count # 1 supervisor + 10 workers + 1 dispatcher

@@ -14,11 +14,7 @@ module Bench
       else
         File.expand_path("../../profiles/#{name_or_path}.yml", __dir__)
       end
-      # Use load_file (not safe_load_file) for compatibility with older Psych
-      # versions (e.g. the system Ruby that `mise run test`'s subshell may
-      # resolve to lacks Psych::safe_load_file). These are trusted, repo-local
-      # YAML files, not user-supplied input, so unrestricted loading is fine.
-      raw = YAML.load_file(path)
+      raw = YAML.safe_load_file(path) || {}
       new(
         name: File.basename(path, ".yml"),
         mysql_cpus: (overrides[:mysql_cpus] || raw.dig("mysql", "cpus") || 1.0).to_f,
