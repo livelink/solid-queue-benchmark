@@ -28,6 +28,16 @@ class StatsTest < Minitest::Test
     assert_equal({ count: 0 }, Bench::Stats.summary([]))
   end
 
+  def test_summary_single_element
+    s = Bench::Stats.summary([42.0])
+    assert_equal 1, s[:count]
+    assert_equal 42.0, s[:mean]
+    assert_equal 42.0, s[:p50]
+    assert_equal 42.0, s[:p95]
+    assert_equal 42.0, s[:p99]
+    assert_equal 42.0, s[:max]
+  end
+
   def test_per_second_buckets
     # unix timestamps: three events in second 100, one in second 102
     ts = [100.1, 100.5, 100.9, 102.3]

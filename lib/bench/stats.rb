@@ -5,23 +5,28 @@ module Bench
 
     def percentile(values, p)
       return nil if values.empty?
-      sorted = values.sort
-      rank = (p / 100.0) * (sorted.length - 1)
-      lo = sorted[rank.floor]
-      hi = sorted[rank.ceil]
-      lo + (hi - lo) * (rank - rank.floor)
+      percentile_of_sorted(values.sort, p)
     end
 
     def summary(values)
       return { count: 0 } if values.empty?
+      sorted = values.sort
       {
-        count: values.length,
-        mean: (values.sum / values.length.to_f).round(2),
-        p50: percentile(values, 50)&.round(2),
-        p95: percentile(values, 95)&.round(2),
-        p99: percentile(values, 99)&.round(2),
-        max: values.max.round(2)
+        count: sorted.length,
+        mean: (sorted.sum / sorted.length.to_f).round(2),
+        p50: percentile_of_sorted(sorted, 50).round(2),
+        p95: percentile_of_sorted(sorted, 95).round(2),
+        p99: percentile_of_sorted(sorted, 99).round(2),
+        max: sorted.last.to_f.round(2)
       }
+    end
+
+    # Assumes `sorted` is non-empty and already sorted ascending.
+    def percentile_of_sorted(sorted, p)
+      rank = (p / 100.0) * (sorted.length - 1)
+      lo = sorted[rank.floor]
+      hi = sorted[rank.ceil]
+      lo + (hi - lo) * (rank - rank.floor)
     end
 
     # timestamps: array of unix-time floats -> [[second, count], ...] with gaps zero-filled
