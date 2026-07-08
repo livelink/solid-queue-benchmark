@@ -1,0 +1,7 @@
+results/
+reports/
+gemfiles/
+harness/log/
+harness/tmp/
+.bundle/
+*.lock

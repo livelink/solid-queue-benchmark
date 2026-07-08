@@ -1,0 +1,11 @@
+# Baseline profile: MySQL deliberately small so contention shows at light load,
+# preserving the production pressure ratio (many pollers per DB core).
+mysql:
+  cpus: 1.0
+  memory: 1g
+workers:
+  count: 10
+  threads: 2
+  polling_interval: 0.1
+dispatcher:
+  count: 1

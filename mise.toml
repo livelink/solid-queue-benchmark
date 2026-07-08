@@ -1,0 +1,18 @@
+[tools]
+ruby = "3.3"
+
+[tasks.setup]
+description = "Install gems for the default (upstream) source and pull the MySQL image"
+run = "bin/bench setup"
+
+[tasks.bench]
+description = "Proxy to bin/bench (e.g. mise run bench -- run baseline --source upstream)"
+run = "bin/bench"
+
+[tasks.test]
+description = "Run orchestrator unit tests"
+run = "ruby -Ilib -Itest -e 'Dir.glob(\"test/**/*_test.rb\").sort.each { |f| require File.expand_path(f) }'"
+
+[tasks.smoke]
+description = "Tiny end-to-end run to verify the pipeline"
+run = "bin/bench run baseline --source upstream --profile smoke --set jobs=100 --set rate=100 --set work_ms=0 --timeout 180"

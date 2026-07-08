@@ -1,0 +1,9 @@
+mysql:
+  cpus: 1.0
+  memory: 1g
+workers:
+  count: 2
+  threads: 2
+  polling_interval: 0.1
+dispatcher:
+  count: 1
