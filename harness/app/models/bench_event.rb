@@ -1,0 +1,2 @@
+class BenchEvent < ApplicationRecord
+end

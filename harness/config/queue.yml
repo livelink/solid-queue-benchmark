@@ -1,0 +1,9 @@
+production:
+  dispatchers:
+    - polling_interval: 1
+      batch_size: 500
+  workers:
+    - queues: "*"
+      threads: <%= ENV.fetch("BENCH_WORKER_THREADS", 2).to_i %>
+      processes: <%= ENV.fetch("BENCH_WORKER_PROCESSES", 10).to_i %>
+      polling_interval: <%= ENV.fetch("BENCH_POLLING_INTERVAL", 0.1).to_f %>

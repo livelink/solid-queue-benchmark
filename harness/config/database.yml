@@ -1,0 +1,8 @@
+production:
+  adapter: trilogy
+  host: 127.0.0.1
+  port: <%= ENV.fetch("BENCH_MYSQL_PORT", 13306).to_i %>
+  username: root
+  password: bench
+  database: bench
+  pool: <%= ENV.fetch("BENCH_WORKER_THREADS", 2).to_i + 3 %>
