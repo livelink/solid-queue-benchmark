@@ -13,13 +13,17 @@ module Bench
     def start
       @io = IO.popen(["docker", "stats", "--format", "{{json .}}", @container], "r")
       @thread = Thread.new do
-        @io.each_line do |line|
-          # docker interleaves ANSI clear codes even in some non-TTY contexts; strip to the JSON
-          json_start = line.index("{")
-          next unless json_start
-          data = JSON.parse(line[json_start..]) rescue next
-          cpu = data["CPUPerc"].to_s.delete("%").to_f
-          @samples << { "t" => Time.now.to_f.round(1), "cpu_pct" => cpu }
+        begin
+          @io.each_line do |line|
+            # docker interleaves ANSI clear codes even in some non-TTY contexts; strip to the JSON
+            json_start = line.index("{")
+            next unless json_start
+            data = JSON.parse(line[json_start..]) rescue next
+            cpu = data["CPUPerc"].to_s.delete("%").to_f
+            @samples << { "t" => Time.now.to_f.round(1), "cpu_pct" => cpu }
+          end
+        rescue IOError, Errno::EBADF
+          # io closed during shutdown — expected
         end
       end
       self
@@ -27,8 +31,9 @@ module Bench
 
     def stop
       Process.kill("TERM", @io.pid) rescue nil
-      @io.close rescue nil
       @thread&.join(5)
+      @io.close rescue nil
+      Process.wait(@io.pid) rescue nil
       @samples
     end
   end
