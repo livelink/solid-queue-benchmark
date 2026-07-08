@@ -1,5 +1,6 @@
 # lib/bench/source_spec.rb
 require "open3"
+require "digest"
 
 module Bench
   SourceSpec = Struct.new(:kind, :version, :path, keyword_init: true) do
@@ -17,7 +18,11 @@ module Bench
     end
 
     def key
-      kind == :path ? "path-#{File.basename(path)}" : "upstream-#{version || "latest"}"
+      if kind == :path
+        "path-#{File.basename(path)}-#{Digest::SHA256.hexdigest(path)[0, 8]}"
+      else
+        "upstream-#{version || "latest"}"
+      end
     end
 
     def to_s
@@ -33,14 +38,18 @@ module Bench
 
     def git_sha
       return nil unless kind == :path
-      out, status = Open3.capture2("git", "-C", path, "rev-parse", "HEAD")
+      out, _err, status = Open3.capture3("git", "-C", path, "rev-parse", "HEAD")
       status.success? ? out.strip : nil
+    rescue Errno::ENOENT
+      nil
     end
 
     def git_dirty?
       return false unless kind == :path
-      out, status = Open3.capture2("git", "-C", path, "status", "--porcelain")
+      out, _err, status = Open3.capture3("git", "-C", path, "status", "--porcelain")
       status.success? && !out.strip.empty?
+    rescue Errno::ENOENT
+      false
     end
   end
 end
