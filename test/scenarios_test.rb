@@ -33,6 +33,11 @@ class ScenariosTest < Minitest::Test
     assert_raises(ArgumentError) { Bench::Scenarios.build("nope", {}) }
   end
 
+  def test_non_integer_param_value_raises
+    err = assert_raises(ArgumentError) { Bench::Scenarios.build("baseline", { "jobs" => "abc" }) }
+    assert_includes err.message, "jobs"
+  end
+
   def test_unknown_param_raises
     assert_raises(ArgumentError) { Bench::Scenarios.build("baseline", { "bogus" => "1" }) }
   end

@@ -21,7 +21,12 @@ module Bench
       unknown = raw_params.keys - defn[:defaults].keys
       raise ArgumentError, "unknown params for #{name}: #{unknown.join(", ")}" if unknown.any?
 
-      params = defn[:defaults].merge(raw_params.transform_values(&:to_i))
+      typed = raw_params.to_h do |k, v|
+        [k, Integer(v)]
+      rescue ArgumentError, TypeError
+        raise ArgumentError, "invalid value for #{name} param #{k}: #{v.inspect} (expected integer)"
+      end
+      params = defn[:defaults].merge(typed)
       Scenario.new(name: name, params: params, expected_total: defn[:expected].call(params))
     end
 
