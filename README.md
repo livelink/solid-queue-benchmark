@@ -18,6 +18,8 @@ mise install
 mise run setup
 ```
 
+If mise reports that `mise.toml` is not trusted, run `mise trust` once in the checkout, then retry.
+
 `setup` bundles the default upstream source and pulls the MySQL image.
 
 ## Run a Benchmark
