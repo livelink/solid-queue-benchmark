@@ -31,9 +31,12 @@ module Bench
 
     def stop
       Process.kill("TERM", @io.pid) rescue nil
-      @thread&.join(5)
-      @io.close rescue nil
-      Process.wait(@io.pid) rescue nil
+      unless @thread&.join(5)
+        # child ignored TERM; escalate so close/reap below can't block
+        Process.kill("KILL", @io.pid) rescue nil
+        @thread&.join(2)
+      end
+      @io.close rescue nil # reaps the popen child and sets $?
       @samples
     end
   end
