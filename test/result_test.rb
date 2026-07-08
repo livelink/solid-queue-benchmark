@@ -29,6 +29,14 @@ class ResultTest < Minitest::Test
     end
   end
 
+  def test_write_rejects_unsafe_run_id
+    Dir.mktmpdir do |dir|
+      result = Bench::Result.new(**sample_attrs, run_id: "evil/../../x")
+      assert_raises(ArgumentError) { result.write(results_dir: dir) }
+      assert_raises(ArgumentError) { result.logs_dir(results_dir: dir) }
+    end
+  end
+
   def test_logs_dir
     Dir.mktmpdir do |dir|
       result = Bench::Result.new(**sample_attrs)
