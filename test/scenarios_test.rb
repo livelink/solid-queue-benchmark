@@ -33,6 +33,16 @@ class ScenariosTest < Minitest::Test
     assert_raises(ArgumentError) { Bench::Scenarios.build("nope", {}) }
   end
 
+  def test_baseline_zero_rate_raises_when_jobs_positive
+    err = assert_raises(ArgumentError) { Bench::Scenarios.build("baseline", { "rate" => "0" }) }
+    assert_includes err.message, "rate"
+  end
+
+  def test_baseline_zero_rate_allowed_for_idle_variant
+    s = Bench::Scenarios.build("baseline", { "jobs" => "0", "rate" => "0" })
+    assert_equal 0, s.expected_total
+  end
+
   def test_non_integer_param_value_raises
     err = assert_raises(ArgumentError) { Bench::Scenarios.build("baseline", { "jobs" => "abc" }) }
     assert_includes err.message, "jobs"
