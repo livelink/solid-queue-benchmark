@@ -15,15 +15,27 @@ when "baseline"
     rate = params.fetch("rate")
     work_ms = params.fetch("work_ms")
     tick = 0.1
-    per_tick = [(rate * tick).ceil, 1].max
+    started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
     enqueued = 0
-    while enqueued < jobs
-      batch_size = [per_tick, jobs - enqueued].min
-      tick_started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-      ActiveJob.perform_all_later(Array.new(batch_size) { BaselineJob.new(work_ms) })
-      enqueued += batch_size
-      elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - tick_started
-      sleep([tick - elapsed, 0].max)
+    credit = 0.0
+    tick_index = 0
+    begin
+      while enqueued < jobs
+        credit += rate * tick
+        batch_size = [credit.floor, jobs - enqueued].min
+        if batch_size.positive?
+          ActiveJob.perform_all_later(Array.new(batch_size) { BaselineJob.new(work_ms) })
+          enqueued += batch_size
+          credit -= batch_size
+        end
+        tick_index += 1
+        next_at = started + tick_index * tick
+        now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+        sleep(next_at - now) if next_at > now
+      end
+    rescue => e
+      warn "drive.rb: crashed after enqueuing #{enqueued}/#{jobs}: #{e.class}: #{e.message}"
+      raise
     end
   end
 when "sprawl"
