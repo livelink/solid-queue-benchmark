@@ -48,6 +48,7 @@ module Bench
         (SELECT COUNT(*) FROM solid_queue_scheduled_executions),
         (SELECT COUNT(*) FROM solid_queue_claimed_executions),
         (SELECT COUNT(*) FROM solid_queue_blocked_executions),
+        (SELECT COUNT(*) FROM solid_queue_failed_executions),
         (SELECT COUNT(*) FROM bench_events)
     SQL
 
@@ -70,7 +71,7 @@ module Bench
                 "t" => Time.now.to_f.round(1),
                 "ready" => row[0].to_i, "scheduled" => row[1].to_i,
                 "claimed" => row[2].to_i, "blocked" => row[3].to_i,
-                "completed" => row[4].to_i
+                "failed" => row[4].to_i, "completed" => row[5].to_i
               }
             end
           rescue StandardError

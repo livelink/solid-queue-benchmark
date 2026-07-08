@@ -8,8 +8,9 @@ module Bench
     module_function
 
     # Run a command, return stdout. Raises Bench::Shell::Error on non-zero exit.
-    def capture(cmd, env: {})
-      stdout, stderr, status = Open3.capture3(env, *cmd)
+    def capture(cmd, env: {}, chdir: nil)
+      opts = chdir ? { chdir: chdir } : {}
+      stdout, stderr, status = Open3.capture3(env, *cmd, **opts)
       unless status.success?
         raise Error, "command failed (#{status.exitstatus}): #{cmd.join(" ")}\n#{stderr}"
       end
