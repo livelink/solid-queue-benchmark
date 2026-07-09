@@ -21,6 +21,19 @@ class ScenariosTest < Minitest::Test
     assert_equal 0, s.expected_total
   end
 
+  def test_baseline_limited_defaults
+    s = Bench::Scenarios.build("baseline_limited", {})
+    assert_equal({ "jobs" => 1_000, "rate" => 500, "work_ms" => 50 }, s.params)
+    assert_equal 1_000, s.expected_total
+  end
+
+  def test_baseline_limited_param_overrides_are_typed
+    s = Bench::Scenarios.build("baseline_limited", { "jobs" => "100", "work_ms" => "0" })
+    assert_equal 100, s.params["jobs"]
+    assert_equal 0, s.params["work_ms"]
+    assert_equal 100, s.expected_total
+  end
+
   def test_sprawl_expected_total_is_geometric
     s = Bench::Scenarios.build("sprawl", {})
     # 100 seeds * (1 + 50 + 50^2) = 255,100
@@ -43,6 +56,11 @@ class ScenariosTest < Minitest::Test
     assert_equal 0, s.expected_total
   end
 
+  def test_baseline_limited_zero_rate_raises_when_jobs_positive
+    err = assert_raises(ArgumentError) { Bench::Scenarios.build("baseline_limited", { "rate" => "0" }) }
+    assert_includes err.message, "rate"
+  end
+
   def test_non_integer_param_value_raises
     err = assert_raises(ArgumentError) { Bench::Scenarios.build("baseline", { "jobs" => "abc" }) }
     assert_includes err.message, "jobs"
@@ -53,6 +71,6 @@ class ScenariosTest < Minitest::Test
   end
 
   def test_names
-    assert_equal %w[baseline sprawl], Bench::Scenarios.names
+    assert_equal %w[baseline baseline_limited sprawl], Bench::Scenarios.names
   end
 end
