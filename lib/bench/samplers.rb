@@ -15,11 +15,8 @@ module Bench
       @thread = Thread.new do
         begin
           @io.each_line do |line|
-            # docker interleaves ANSI clear codes even in some non-TTY contexts; strip to the JSON
-            json_start = line.index("{")
-            next unless json_start
-            data = JSON.parse(line[json_start..]) rescue next
-            cpu = data["CPUPerc"].to_s.delete("%").to_f
+            cpu = self.class.parse_cpu_pct(line)
+            next unless cpu
             @samples << { "t" => Time.now.to_f.round(1), "cpu_pct" => cpu }
           end
         rescue IOError, Errno::EBADF
@@ -27,6 +24,21 @@ module Bench
         end
       end
       self
+    end
+
+    # docker interleaves ANSI cursor/clear codes even in non-TTY contexts, both
+    # around AND after the JSON object on the same line — slice to the matching
+    # closing brace, not just to end of line, or JSON.parse rejects the trailing bytes.
+    def self.parse_cpu_pct(line)
+      json_start = line.index("{")
+      json_end = line.rindex("}")
+      return nil unless json_start && json_end
+      begin
+        data = JSON.parse(line[json_start..json_end])
+      rescue JSON::ParserError
+        return nil
+      end
+      data["CPUPerc"].to_s.delete("%").to_f
     end
 
     def stop
