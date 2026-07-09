@@ -152,4 +152,18 @@ class ProgressReporterInstanceTest < Minitest::Test
     Bench::ProgressReporter.new(expected_total: 500, io: io).finish
     assert_equal "", io.string
   end
+
+  def test_finish_does_not_reprint_a_line_the_last_update_already_showed
+    io = StringIO.new
+    reporter = Bench::ProgressReporter.new(expected_total: 500, io: io, plain_interval: 10)
+
+    reporter.update([{ "t" => 0.0, "completed" => 10 }])
+    final_samples = [{ "t" => 0.0, "completed" => 10 }, { "t" => 10.0, "completed" => 500 }]
+    reporter.update(final_samples) # dt == plain_interval, not throttled -> prints "500/500..." itself
+    reporter.finish(final_samples) # same final sample already shown -> must not print again
+
+    lines = io.string.lines
+    assert_equal 2, lines.length
+    assert_includes lines[1], "500/500 completed"
+  end
 end

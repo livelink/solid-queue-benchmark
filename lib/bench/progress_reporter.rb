@@ -27,7 +27,7 @@ module Bench
     def finish(samples = nil)
       if @tty
         @io.print("\n")
-      elsif samples && !samples.empty?
+      elsif samples && !samples.empty? && samples.last["t"] != @last_plain_t
         @io.puts(render(samples))
       end
     end
