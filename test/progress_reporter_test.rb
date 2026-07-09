@@ -57,3 +57,20 @@ class ProgressReporterEtaSecondsTest < Minitest::Test
     assert_operator eta, :<, 20.0 # meaningfully faster than the naive overall-average ETA (~23.67s)
   end
 end
+
+class ProgressReporterFormatLineTest < Minitest::Test
+  def test_formats_line_with_eta
+    line = Bench::ProgressReporter.format_line(1234, 5000, 330.0)
+    assert_equal "1234/5000 completed (24.7%) | ETA 5m 30s", line
+  end
+
+  def test_formats_line_without_eta
+    line = Bench::ProgressReporter.format_line(0, 5000, nil)
+    assert_equal "0/5000 completed (0.0%) | ETA calculating...", line
+  end
+
+  def test_formats_line_with_zero_expected_total
+    line = Bench::ProgressReporter.format_line(0, 0, nil)
+    assert_equal "0/0 completed (0.0%) | ETA calculating...", line
+  end
+end

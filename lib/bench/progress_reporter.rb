@@ -29,5 +29,11 @@ module Bench
 
       remaining / (dc / dt)
     end
+
+    def self.format_line(completed, expected_total, eta_seconds)
+      pct = expected_total.zero? ? 0.0 : (100.0 * completed / expected_total).round(1)
+      eta_str = eta_seconds ? "ETA #{format_duration(eta_seconds)}" : "ETA calculating..."
+      format("%d/%d completed (%.1f%%) | %s", completed, expected_total, pct, eta_str)
+    end
   end
 end
