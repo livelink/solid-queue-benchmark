@@ -174,7 +174,7 @@ Add to `lib/bench/progress_reporter.rb`, inside `class ProgressReporter`, after 
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `ruby -Ilib -Itest test/progress_reporter_test.rb`
-Expected: `9 runs, 12 assertions, 0 failures, 0 errors, 0 skips`
+Expected: `9 runs, 13 assertions, 0 failures, 0 errors, 0 skips` (this Minitest version counts `assert_operator` as 2 assertions internally — `0 failures, 0 errors, 0 skips` is what matters)
 
 - [ ] **Step 5: Commit**
 
@@ -234,7 +234,7 @@ Add to `lib/bench/progress_reporter.rb`, after `eta_seconds`:
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `ruby -Ilib -Itest test/progress_reporter_test.rb`
-Expected: `12 runs, 15 assertions, 0 failures, 0 errors, 0 skips`
+Expected: `12 runs, 16 assertions, 0 failures, 0 errors, 0 skips` (this Minitest version counts `assert_operator`/`assert_includes`/`assert_match` as 2 assertions each internally — the exact number matters less than `0 failures, 0 errors, 0 skips`)
 
 - [ ] **Step 5: Commit**
 
@@ -361,7 +361,7 @@ Add to `lib/bench/progress_reporter.rb`, inside `class ProgressReporter`, before
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `ruby -Ilib -Itest test/progress_reporter_test.rb`
-Expected: `16 runs, 24 assertions, 0 failures, 0 errors, 0 skips`
+Expected: `16 runs, 29 assertions, 0 failures, 0 errors, 0 skips` (again, this Minitest version double-counts `assert_includes`/`assert_match` — `0 failures, 0 errors, 0 skips` is what matters)
 
 - [ ] **Step 5: Commit**
 
