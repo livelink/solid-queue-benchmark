@@ -13,5 +13,21 @@ module Bench
         format("%ds", secs)
       end
     end
+
+    def self.eta_seconds(samples, expected_total, window: 12)
+      return nil if samples.length < 2
+
+      latest = samples.last
+      reference = samples.reverse_each.find { |s| latest["t"] - s["t"] >= window } || samples.first
+
+      dt = latest["t"] - reference["t"]
+      dc = latest["completed"] - reference["completed"]
+      return nil if dt <= 0 || dc <= 0
+
+      remaining = expected_total - latest["completed"]
+      return 0.0 if remaining <= 0
+
+      remaining / (dc / dt)
+    end
   end
 end
