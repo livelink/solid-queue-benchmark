@@ -1,6 +1,36 @@
 # lib/bench/progress_reporter.rb
 module Bench
   class ProgressReporter
+    def initialize(expected_total:, io: $stdout, window: 12, plain_interval: 10)
+      @expected_total = expected_total
+      @io = io
+      @window = window
+      @plain_interval = plain_interval
+      @tty = io.respond_to?(:tty?) && io.tty?
+      @last_plain_t = nil
+    end
+
+    def update(samples)
+      return if samples.empty?
+
+      latest = samples.last
+      eta = self.class.eta_seconds(samples, @expected_total, window: @window)
+      line = self.class.format_line(latest["completed"], @expected_total, eta)
+
+      if @tty
+        @io.print("\r#{line}\e[K")
+      else
+        t = latest["t"]
+        return if @last_plain_t && (t - @last_plain_t) < @plain_interval
+        @last_plain_t = t
+        @io.puts(line)
+      end
+    end
+
+    def finish
+      @io.print("\n") if @tty
+    end
+
     def self.format_duration(seconds)
       total = seconds.round
       hours, remainder = total.divmod(3600)

@@ -74,3 +74,63 @@ class ProgressReporterFormatLineTest < Minitest::Test
     assert_equal "0/0 completed (0.0%) | ETA calculating...", line
   end
 end
+
+require "stringio"
+
+class FakeTTY
+  attr_reader :writes
+
+  def initialize
+    @writes = []
+  end
+
+  def tty? = true
+  def print(str) = @writes << str
+end
+
+class ProgressReporterInstanceTest < Minitest::Test
+  def test_update_is_noop_with_empty_samples
+    io = StringIO.new
+    Bench::ProgressReporter.new(expected_total: 500, io: io).update([])
+    assert_equal "", io.string
+  end
+
+  def test_non_tty_prints_immediately_then_throttles_by_sample_time
+    io = StringIO.new
+    reporter = Bench::ProgressReporter.new(expected_total: 500, io: io, plain_interval: 10)
+
+    reporter.update([{ "t" => 0.0, "completed" => 10 }])
+    reporter.update([{ "t" => 0.0, "completed" => 10 }, { "t" => 5.0, "completed" => 60 }])
+    reporter.update([
+      { "t" => 0.0, "completed" => 10 }, { "t" => 5.0, "completed" => 60 },
+      { "t" => 11.0, "completed" => 120 }
+    ])
+
+    lines = io.string.lines
+    assert_equal 2, lines.length
+    assert_includes lines[0], "10/500 completed"
+    assert_includes lines[1], "120/500 completed"
+  end
+
+  def test_tty_redraws_in_place_on_every_update
+    io = FakeTTY.new
+    reporter = Bench::ProgressReporter.new(expected_total: 500, io: io)
+
+    reporter.update([{ "t" => 0.0, "completed" => 10 }])
+    reporter.update([{ "t" => 0.1, "completed" => 12 }])
+
+    assert_equal 2, io.writes.length
+    assert_match(/\A\r10\/500 completed.*\e\[K\z/, io.writes[0])
+    assert_match(/\A\r12\/500 completed.*\e\[K\z/, io.writes[1])
+  end
+
+  def test_finish_prints_newline_on_tty_only
+    tty_io = FakeTTY.new
+    Bench::ProgressReporter.new(expected_total: 500, io: tty_io).finish
+    assert_equal ["\n"], tty_io.writes
+
+    plain_io = StringIO.new
+    Bench::ProgressReporter.new(expected_total: 500, io: plain_io).finish
+    assert_equal "", plain_io.string
+  end
+end
