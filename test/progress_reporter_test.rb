@@ -133,4 +133,23 @@ class ProgressReporterInstanceTest < Minitest::Test
     Bench::ProgressReporter.new(expected_total: 500, io: plain_io).finish
     assert_equal "", plain_io.string
   end
+
+  def test_finish_forces_an_unthrottled_final_line_on_non_tty
+    io = StringIO.new
+    reporter = Bench::ProgressReporter.new(expected_total: 500, io: io, plain_interval: 10)
+
+    reporter.update([{ "t" => 0.0, "completed" => 10 }])
+    reporter.finish([{ "t" => 0.0, "completed" => 10 }, { "t" => 1.0, "completed" => 500 }])
+
+    lines = io.string.lines
+    assert_equal 2, lines.length
+    assert_includes lines[0], "10/500 completed"
+    assert_includes lines[1], "500/500 completed"
+  end
+
+  def test_finish_with_no_samples_is_a_noop_on_non_tty
+    io = StringIO.new
+    Bench::ProgressReporter.new(expected_total: 500, io: io).finish
+    assert_equal "", io.string
+  end
 end

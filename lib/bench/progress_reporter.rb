@@ -13,22 +13,31 @@ module Bench
     def update(samples)
       return if samples.empty?
 
-      latest = samples.last
-      eta = self.class.eta_seconds(samples, @expected_total, window: @window)
-      line = self.class.format_line(latest["completed"], @expected_total, eta)
-
+      line = render(samples)
       if @tty
         @io.print("\r#{line}\e[K")
       else
-        t = latest["t"]
+        t = samples.last["t"]
         return if @last_plain_t && (t - @last_plain_t) < @plain_interval
         @last_plain_t = t
         @io.puts(line)
       end
     end
 
-    def finish
-      @io.print("\n") if @tty
+    def finish(samples = nil)
+      if @tty
+        @io.print("\n")
+      elsif samples && !samples.empty?
+        @io.puts(render(samples))
+      end
+    end
+
+    private
+
+    def render(samples)
+      latest = samples.last
+      eta = self.class.eta_seconds(samples, @expected_total, window: @window)
+      self.class.format_line(latest["completed"], @expected_total, eta)
     end
 
     def self.format_duration(seconds)
