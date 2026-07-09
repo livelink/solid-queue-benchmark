@@ -8,11 +8,11 @@ PATH = "{{env.HOME}}/.local/share/mise/shims:{{env.PATH}}"
 
 [tasks.setup]
 description = "Install gems for the default (upstream) source and pull the MySQL image"
-run = "mise exec -- bin/bench setup"
+run = "mise exec -- ruby bin/bench setup"
 
 [tasks.bench]
 description = "Proxy to bin/bench (e.g. mise run bench -- run baseline --source upstream)"
-run = "mise exec -- bin/bench"
+run = "mise exec -- ruby bin/bench"
 
 [tasks.test]
 description = "Run orchestrator unit tests"
@@ -20,4 +20,4 @@ run = "mise exec -- ruby -Ilib -Itest -e 'Dir.glob(\"test/**/*_test.rb\").sort.e
 
 [tasks.smoke]
 description = "Tiny end-to-end run to verify the pipeline"
-run = "mise exec -- bin/bench run baseline --source upstream --profile smoke --set jobs=100 --set rate=100 --set work_ms=0 --timeout 180"
+run = "mise exec -- ruby bin/bench run baseline --source upstream --profile smoke --set jobs=100 --set rate=100 --set work_ms=0 --timeout 180"

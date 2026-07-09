@@ -1,5 +1,6 @@
 # lib/bench/shell.rb
 require "open3"
+require "rbconfig"
 
 module Bench
   module Shell
@@ -7,12 +8,21 @@ module Bench
 
     module_function
 
+    def ruby_cmd(*args)
+      [RbConfig.ruby, *args]
+    end
+
+    def bundle_cmd(*args)
+      ruby_cmd("-S", "bundle", *args)
+    end
+
     # Run a command, return stdout. Raises Bench::Shell::Error on non-zero exit.
     def capture(cmd, env: {}, chdir: nil)
       opts = chdir ? { chdir: chdir } : {}
       stdout, stderr, status = Open3.capture3(env, *cmd, **opts)
       unless status.success?
-        raise Error, "command failed (#{status.exitstatus}): #{cmd.join(" ")}\n#{stderr}"
+        details = [stderr, stdout].reject(&:empty?).join("\n")
+        raise Error, "command failed (#{status.exitstatus}): #{cmd.join(" ")}\n#{details}"
       end
       stdout
     end

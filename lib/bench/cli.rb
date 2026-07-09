@@ -127,7 +127,7 @@ module Bench
       FileUtils.mkdir_p(File.join(ROOT, "gemfiles"))
       gemfile = File.join(ROOT, "gemfiles", "#{source.key}.gemfile")
       File.write(gemfile, source.wrapper_gemfile_contents)
-      Shell.capture(%w[bundle install], env: { "BUNDLE_GEMFILE" => gemfile })
+      Shell.capture(Shell.bundle_cmd("install"), env: { "BUNDLE_GEMFILE" => gemfile })
       Shell.capture(%w[docker compose pull mysql])
       puts "setup: ok"
     end

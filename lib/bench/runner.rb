@@ -113,16 +113,16 @@ module Bench
       FileUtils.mkdir_p(File.join(@root, "gemfiles"))
       File.write(gemfile_path, @source.wrapper_gemfile_contents)
       begin
-        Shell.capture(%w[bundle check], env: base_env)
+        Shell.capture(Shell.bundle_cmd("check"), env: base_env)
       rescue Shell::Error
-        Shell.capture(%w[bundle install], env: base_env)
+        Shell.capture(Shell.bundle_cmd("install"), env: base_env)
       end
       build_source_info
     end
 
     def build_source_info
       version = Shell.capture(
-        ["bundle", "exec", "ruby", "-e", 'require "solid_queue/version"; print SolidQueue::VERSION'],
+        Shell.bundle_cmd("exec", *Shell.ruby_cmd("-e", 'require "solid_queue/version"; print SolidQueue::VERSION')),
         env: base_env
       ).strip
       sha = @source.git_sha
@@ -143,7 +143,7 @@ module Bench
 
     def db_setup(logs)
       out = Shell.capture(
-        %w[bundle exec bin/rails runner script/db_setup.rb],
+        Shell.bundle_cmd("exec", *Shell.ruby_cmd("bin/rails", "runner", "script/db_setup.rb")),
         env: base_env, chdir: harness_dir
       )
       File.write(File.join(logs, "db_setup.log"), out)
@@ -153,7 +153,7 @@ module Bench
 
     def start_supervisor(logs)
       Shell.spawn_logged(
-        %w[bundle exec bin/jobs start],
+        Shell.bundle_cmd("exec", *Shell.ruby_cmd("bin/jobs", "start")),
         env: base_env, chdir: harness_dir,
         log_path: File.join(logs, "supervisor.log")
       )
@@ -188,7 +188,7 @@ module Bench
       scenario_file = File.join(results_dir, "scenario-#{@scenario.name}.json")
       File.write(scenario_file, JSON.generate({ scenario: @scenario.name, params: @scenario.params }))
       pid = Shell.spawn_logged(
-        %w[bundle exec bin/rails runner script/drive.rb],
+        Shell.bundle_cmd("exec", *Shell.ruby_cmd("bin/rails", "runner", "script/drive.rb")),
         env: base_env.merge("BENCH_SCENARIO_FILE" => scenario_file),
         chdir: harness_dir, log_path: File.join(logs, "driver.log")
       )
