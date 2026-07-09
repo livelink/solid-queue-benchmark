@@ -13,8 +13,12 @@ While a run is draining, show an updating status line with completed/expected co
 and an ETA, e.g.:
 
 ```
-1,234/5,000 completed (24.7%) | ETA 5m 30s
+1234/5000 completed (24.7%) | ETA 5m 30s
 ```
+
+(No thousands-separator grouping — the project is stdlib-only with no ActiveSupport/
+`number_with_delimiter`, per `context.md`, and it's not worth a hand-rolled comma-grouping
+helper for this.)
 
 ## Scope
 
@@ -49,7 +53,10 @@ end
 - **non-TTY** (piped output, CI logs, redirected to a file): print the line with a trailing
   newline via `io.puts(line)`, throttled to at most once per `plain_interval` seconds (default
   10s), so log files get periodic progress without carriage-return control characters or a
-  flood of near-identical lines.
+  flood of near-identical lines. The throttle clock is the **latest sample's `"t"`** (the same
+  timestamp `eta_seconds` already reads), not `Time.now` — this gives tests a seam to control
+  time deterministically via synthetic sample data instead of sleeping or stubbing `Time`. The
+  very first `update` call always prints immediately (nothing to throttle against yet).
 
 `finish` prints a bare newline (TTY mode only) so whatever prints next — `completed: <path>`,
 an error message, or the next repeat's `== run i/N` header — starts on a clean line.
@@ -76,8 +83,13 @@ out to a class method so it's testable without spinning up threads or real I/O:
 - `ProgressReporter.eta_seconds(samples, expected_total, window:)` → `Float` or `nil`
 - `ProgressReporter.format_duration(seconds)` → `"5m 30s"` / `"1h 2m 3s"` / `"45s"`
 - `ProgressReporter.format_line(completed, expected_total, eta_seconds)` → the full status string
+  — percent is `(100.0 * completed / expected_total).round(1)` (guard `expected_total.zero?` by
+  returning `0.0` for percent, though in practice `wait_for_drain` never constructs a reporter
+  when `expected_total` is 0).
 
-The instance (`#update`/`#finish`) is a thin I/O/throttling wrapper around these.
+The instance (`#update`/`#finish`) is a thin I/O/throttling wrapper around these, keyed off
+sample timestamps rather than wall-clock `Time.now` (see throttle clock note above) so behavior
+is deterministic and testable from synthetic sample arrays alone.
 
 ### Integration point
 
@@ -134,6 +146,11 @@ path: normal completion, job failure, or timeout.
   `wait_for_drain`; each drain phase's line is finished (newline) before the next repeat's
   `== run i/N` header prints.
 - Empty/no samples yet when `update` is first called: no-op rather than crashing on `nil`.
+- `DepthSampler#samples` is appended to by its own background thread while `wait_for_drain` (main
+  thread) reads it via `reporter.update(depth_sampler.samples)`. This is the same access pattern
+  `wait_for_drain` already uses via `depth_sampler.latest` today — `ProgressReporter` only ever
+  reads the array (`.last`, iterating backward for the window), never mutates it, so it inherits
+  the existing (pre-established, not newly introduced) concurrency characteristics.
 
 ## Testing
 
@@ -143,11 +160,13 @@ New `test/progress_reporter_test.rb` (Minitest, no mocking library — matches e
 - `eta_seconds`: steady-rate synthetic samples → expected seconds within a delta; accelerating
   rate → reflects the recent window, not the overall average; fewer than 2 samples → `nil`;
   zero/negative rate → `nil`; `completed >= expected_total` → `0`.
-- `format_line`: renders `"completed/expected"`, percent, and either the ETA string or
-  `"ETA calculating..."`.
-- `#update` with a `StringIO` (non-TTY): asserts a plain line with newline is written, and that
-  a second call within `plain_interval` seconds does not write again (throttling) — inject a
-  fake clock or pass explicit timestamps rather than sleeping in the test.
+- `format_line`: renders `"completed/expected"`, percent (rounded to 1 decimal), and either the
+  ETA string or `"ETA calculating..."`.
+- `#update` with a `StringIO` (non-TTY): first call with a sample array prints one plain line
+  immediately; a second `update` call with a sample whose `"t"` is less than `plain_interval`
+  seconds after the first sample's `"t"` does not print again; a third call with a sample `"t"`
+  past the throttle window does print. All driven by synthetic sample timestamps — no real
+  sleeping or `Time` stubbing needed, since the throttle clock is sample-time, not `Time.now`.
 - `#update` with a fake IO object (`tty?` stubbed `true`, capturing `print` calls): asserts
   `\r`-prefixed, `\e[K`-suffixed, no-newline output on every call (no throttling in TTY mode).
 - `#finish`: writes a bare newline in TTY mode, no-op in non-TTY mode.
