@@ -15,6 +15,15 @@ module Bench
           end
         end
       },
+      "baseline_limited" => {
+        defaults: { "jobs" => 1_000, "rate" => 500, "work_ms" => 50 },
+        expected: ->(p) { p["jobs"] },
+        validate: ->(p) do
+          if p["jobs"] > 0 && p["rate"] < 1
+            raise ArgumentError, "baseline_limited rate must be >= 1 (got #{p["rate"]})"
+          end
+        end
+      },
       "sprawl" => {
         defaults: { "seeds" => 100, "fanout" => 50, "depth" => 2, "work_ms" => 10 },
         expected: ->(p) { p["seeds"] * (0..p["depth"]).sum { |i| p["fanout"]**i } }

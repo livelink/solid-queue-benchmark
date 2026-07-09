@@ -45,12 +45,15 @@ solid_queue supervisor, runs the scenario, waits for drain, and writes
 | Scenario | Params (`--set key=val`) | Measures |
 |---|---|---|
 | `baseline` | `jobs=20000 rate=500 work_ms=50 duration=60` | Steady-state throughput and latency. `jobs=0` measures idle polling for `duration` seconds. |
+| `baseline_limited` | `jobs=1000 rate=500 work_ms=50` | Same job work as `baseline`, with a class-level `limits_concurrency` limit of 1 for blocked-execution and throttling cost. |
 | `sprawl` | `seeds=100 fanout=50 depth=2 work_ms=10` | Fan-out burst where each job enqueues `fanout` children down to `depth`. Defaults total 255,100 jobs; reduce params for quick runs. |
 
 Examples:
 
 ```sh
 bin/bench run baseline --source upstream --profile smoke --set jobs=100 --set rate=100 --set work_ms=0 --timeout 180
+bin/bench run baseline --source upstream --set jobs=1000 --set rate=500 --set work_ms=50
+bin/bench run baseline_limited --source upstream --set jobs=1000 --set rate=500 --set work_ms=50
 bin/bench run sprawl --source path:~/Projects/solid_queue --set seeds=5 --set fanout=10 --set depth=1
 ```
 
