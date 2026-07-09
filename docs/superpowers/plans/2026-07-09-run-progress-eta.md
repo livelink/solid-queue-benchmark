@@ -314,8 +314,29 @@ class ProgressReporterInstanceTest < Minitest::Test
     Bench::ProgressReporter.new(expected_total: 500, io: plain_io).finish
     assert_equal "", plain_io.string
   end
+
+  def test_finish_forces_an_unthrottled_final_line_on_non_tty
+    io = StringIO.new
+    reporter = Bench::ProgressReporter.new(expected_total: 500, io: io, plain_interval: 10)
+
+    reporter.update([{ "t" => 0.0, "completed" => 10 }])
+    reporter.finish([{ "t" => 0.0, "completed" => 10 }, { "t" => 1.0, "completed" => 500 }])
+
+    lines = io.string.lines
+    assert_equal 2, lines.length
+    assert_includes lines[0], "10/500 completed"
+    assert_includes lines[1], "500/500 completed"
+  end
+
+  def test_finish_with_no_samples_is_a_noop_on_non_tty
+    io = StringIO.new
+    Bench::ProgressReporter.new(expected_total: 500, io: io).finish
+    assert_equal "", io.string
+  end
 end
 ```
+
+**Design note (added after Task 4's code-quality review):** `finish` originally took no arguments and only ever printed a bare newline in TTY mode — on non-TTY output, if a run completed within `plain_interval` seconds of the last printed line, the log would never show a final/100% line, undercutting the whole point of the non-TTY branch. `finish` is revised to accept optional final `samples` and force one last **unthrottled** line in non-TTY mode when given them, so piped/log output always ends with a definitive completion line.
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
@@ -339,29 +360,38 @@ Add to `lib/bench/progress_reporter.rb`, inside `class ProgressReporter`, before
     def update(samples)
       return if samples.empty?
 
-      latest = samples.last
-      eta = self.class.eta_seconds(samples, @expected_total, window: @window)
-      line = self.class.format_line(latest["completed"], @expected_total, eta)
-
+      line = render(samples)
       if @tty
         @io.print("\r#{line}\e[K")
       else
-        t = latest["t"]
+        t = samples.last["t"]
         return if @last_plain_t && (t - @last_plain_t) < @plain_interval
         @last_plain_t = t
         @io.puts(line)
       end
     end
 
-    def finish
-      @io.print("\n") if @tty
+    def finish(samples = nil)
+      if @tty
+        @io.print("\n")
+      elsif samples && !samples.empty?
+        @io.puts(render(samples))
+      end
+    end
+
+    private
+
+    def render(samples)
+      latest = samples.last
+      eta = self.class.eta_seconds(samples, @expected_total, window: @window)
+      self.class.format_line(latest["completed"], @expected_total, eta)
     end
 ```
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `ruby -Ilib -Itest test/progress_reporter_test.rb`
-Expected: `16 runs, 29 assertions, 0 failures, 0 errors, 0 skips` (again, this Minitest version double-counts `assert_includes`/`assert_match` — `0 failures, 0 errors, 0 skips` is what matters)
+Expected: `18 runs, 35 assertions, 0 failures, 0 errors, 0 skips` (this Minitest version double-counts `assert_includes`/`assert_match` — `0 failures, 0 errors, 0 skips` is what matters)
 
 - [ ] **Step 5: Commit**
 
@@ -459,15 +489,17 @@ with:
           sleep 1
         end
       ensure
-        reporter.finish
+        reporter.finish(depth_sampler.samples)
       end
     end
 ```
 
+`reporter.finish(depth_sampler.samples)` passes the full sample history so non-TTY output gets one last unthrottled line reflecting the true final state, whether the drain succeeded, a job failed, or it timed out (see Task 4's revised `finish`).
+
 - [ ] **Step 3: Run the full test suite to confirm nothing broke**
 
 Run: `mise run test`
-Expected: all tests pass, no failures or errors (existing suite plus the 16 new `ProgressReporter` tests)
+Expected: all tests pass, no failures or errors (existing suite plus the `ProgressReporter` tests)
 
 - [ ] **Step 4: Commit**
 
