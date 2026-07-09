@@ -6,6 +6,7 @@ require "bench/shell"
 require "bench/mysql_client"
 require "bench/digests"
 require "bench/samplers"
+require "bench/progress_reporter"
 require "bench/stats"
 require "bench/result"
 
@@ -197,21 +198,27 @@ module Bench
 
     def wait_for_drain(depth_sampler)
       return if @scenario.expected_total.zero?
+      reporter = ProgressReporter.new(expected_total: @scenario.expected_total)
       deadline = Time.now + @timeout
-      loop do
-        snap = depth_sampler.latest
-        if snap && snap["failed"].positive?
-          raise RunFailure, "#{snap["failed"]} job(s) failed during the run (see solid_queue_failed_executions)"
+      begin
+        loop do
+          snap = depth_sampler.latest
+          if snap && snap["failed"].positive?
+            raise RunFailure, "#{snap["failed"]} job(s) failed during the run (see solid_queue_failed_executions)"
+          end
+          reporter.update(depth_sampler.samples) if snap
+          if snap && snap["completed"] >= @scenario.expected_total &&
+             snap.values_at("ready", "scheduled", "claimed", "blocked").sum.zero?
+            return
+          end
+          if Time.now > deadline
+            done = snap ? snap["completed"] : "?"
+            raise RunFailure, "drain timeout after #{@timeout}s (#{done}/#{@scenario.expected_total} completed)"
+          end
+          sleep 1
         end
-        if snap && snap["completed"] >= @scenario.expected_total &&
-           snap.values_at("ready", "scheduled", "claimed", "blocked").sum.zero?
-          return
-        end
-        if Time.now > deadline
-          done = snap ? snap["completed"] : "?"
-          raise RunFailure, "drain timeout after #{@timeout}s (#{done}/#{@scenario.expected_total} completed)"
-        end
-        sleep 1
+      ensure
+        reporter.finish(depth_sampler.samples)
       end
     end
 
