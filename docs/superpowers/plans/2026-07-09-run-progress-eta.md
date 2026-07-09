@@ -333,10 +333,26 @@ class ProgressReporterInstanceTest < Minitest::Test
     Bench::ProgressReporter.new(expected_total: 500, io: io).finish
     assert_equal "", io.string
   end
+
+  def test_finish_does_not_reprint_a_line_the_last_update_already_showed
+    io = StringIO.new
+    reporter = Bench::ProgressReporter.new(expected_total: 500, io: io, plain_interval: 10)
+
+    reporter.update([{ "t" => 0.0, "completed" => 10 }])
+    final_samples = [{ "t" => 0.0, "completed" => 10 }, { "t" => 10.0, "completed" => 500 }]
+    reporter.update(final_samples) # dt == plain_interval, not throttled -> prints "500/500..." itself
+    reporter.finish(final_samples) # same final sample already shown -> must not print again
+
+    lines = io.string.lines
+    assert_equal 2, lines.length
+    assert_includes lines[1], "500/500 completed"
+  end
 end
 ```
 
 **Design note (added after Task 4's code-quality review):** `finish` originally took no arguments and only ever printed a bare newline in TTY mode — on non-TTY output, if a run completed within `plain_interval` seconds of the last printed line, the log would never show a final/100% line, undercutting the whole point of the non-TTY branch. `finish` is revised to accept optional final `samples` and force one last **unthrottled** line in non-TTY mode when given them, so piped/log output always ends with a definitive completion line.
+
+**Second design note (added after the final whole-feature review, following Task 5):** the fix above introduced a duplicate-line bug. `Runner#wait_for_drain` calls `reporter.update(depth_sampler.samples)` and then, on the very same loop iteration, either returns or raises — at which point `ensure` calls `reporter.finish(depth_sampler.samples)` with that *same* sample array. If that last `update` call happened to land outside the throttle window (so it printed on its own), `finish` would then unconditionally print the identical line again right after it. Fixed by having `finish` skip its forced print when the given samples' last timestamp matches `@last_plain_t` (the timestamp of whatever was last actually printed) — i.e., only force a final line when the natural `update` calls didn't already show this exact final state.
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
@@ -374,7 +390,7 @@ Add to `lib/bench/progress_reporter.rb`, inside `class ProgressReporter`, before
     def finish(samples = nil)
       if @tty
         @io.print("\n")
-      elsif samples && !samples.empty?
+      elsif samples && !samples.empty? && samples.last["t"] != @last_plain_t
         @io.puts(render(samples))
       end
     end
@@ -391,7 +407,7 @@ Add to `lib/bench/progress_reporter.rb`, inside `class ProgressReporter`, before
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `ruby -Ilib -Itest test/progress_reporter_test.rb`
-Expected: `18 runs, 35 assertions, 0 failures, 0 errors, 0 skips` (this Minitest version double-counts `assert_includes`/`assert_match` — `0 failures, 0 errors, 0 skips` is what matters)
+Expected: `19 runs, 38 assertions, 0 failures, 0 errors, 0 skips` (this Minitest version double-counts `assert_includes`/`assert_match` — `0 failures, 0 errors, 0 skips` is what matters)
 
 - [ ] **Step 5: Commit**
 
