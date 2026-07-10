@@ -5,8 +5,8 @@ require "bench/profile"
 class ProfileTest < Minitest::Test
   def test_loads_default_profile_by_name
     p = Bench::Profile.load("default")
-    assert_equal 1.0, p.mysql_cpus
-    assert_equal "1g", p.mysql_memory
+    assert_equal 1.0, p.db_cpus
+    assert_equal "1g", p.db_memory
     assert_equal 10, p.workers
     assert_equal 2, p.threads
     assert_equal 0.1, p.polling_interval
@@ -14,9 +14,9 @@ class ProfileTest < Minitest::Test
   end
 
   def test_cli_overrides_win
-    p = Bench::Profile.load("default", workers: 50, mysql_cpus: 2.0)
+    p = Bench::Profile.load("default", workers: 50, db_cpus: 2.0)
     assert_equal 50, p.workers
-    assert_equal 2.0, p.mysql_cpus
+    assert_equal 2.0, p.db_cpus
     assert_equal 2, p.threads # untouched
   end
 
@@ -24,8 +24,8 @@ class ProfileTest < Minitest::Test
     p = Bench::Profile.load("smoke")
     assert_equal(
       {
-        "BENCH_MYSQL_CPUS" => "1.0",
-        "BENCH_MYSQL_MEMORY" => "1g",
+        "BENCH_DB_CPUS" => "1.0",
+        "BENCH_DB_MEMORY" => "1g",
         "BENCH_WORKER_PROCESSES" => "2",
         "BENCH_WORKER_THREADS" => "2",
         "BENCH_POLLING_INTERVAL" => "0.1"
