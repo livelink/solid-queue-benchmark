@@ -7,6 +7,7 @@ class ResultTest < Minitest::Test
   def sample_attrs
     {
       run_id: "20260708-140000-baseline-upstream-latest",
+      database: "postgres",
       scenario: { name: "baseline", params: { "jobs" => 100 }, expected_total: 100 },
       source: { spec: "upstream", resolved_version: "1.2.4", sha: nil, dirty: false },
       profile: { name: "smoke", workers: 2 },
@@ -24,6 +25,7 @@ class ResultTest < Minitest::Test
       assert_equal File.join(dir, "20260708-140000-baseline-upstream-latest", "result.json"), path
       loaded = Bench::Result.load(path)
       assert_equal "completed", loaded.status
+      assert_equal "postgres", loaded.database
       assert_equal "baseline", loaded.scenario["name"]
       assert_equal 88.1, loaded.metrics["throughput_jobs_per_sec"]
     end
