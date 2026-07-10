@@ -52,6 +52,11 @@ when "sprawl"
     SprawlJob.new(depth: params.fetch("depth"), fanout: params.fetch("fanout"), work_ms: params.fetch("work_ms"))
   end
   ActiveJob.perform_all_later(seeds)
+when "sprawl_limited"
+  seeds = Array.new(params.fetch("seeds")) do
+    SprawlLimitedJob.new(depth: params.fetch("depth"), fanout: params.fetch("fanout"), work_ms: params.fetch("work_ms"))
+  end
+  ActiveJob.perform_all_later(seeds)
 else
   abort "drive.rb: unknown scenario #{spec["scenario"].inspect}"
 end

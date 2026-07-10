@@ -7,8 +7,8 @@ class SprawlJob < ApplicationJob
   def perform(depth:, fanout:, work_ms:)
     if depth.positive?
       fanout.times do |i|
-        SprawlJob.set(priority: PRIORITIES[i % PRIORITIES.size])
-                 .perform_later(depth: depth - 1, fanout: fanout, work_ms: work_ms)
+        self.class.set(priority: PRIORITIES[i % PRIORITIES.size])
+                  .perform_later(depth: depth - 1, fanout: fanout, work_ms: work_ms)
       end
     end
     sleep(work_ms / 1000.0) if work_ms.positive?

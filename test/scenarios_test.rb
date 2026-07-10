@@ -42,6 +42,14 @@ class ScenariosTest < Minitest::Test
     assert_equal 8, small.expected_total # 2 * (1 + 3)
   end
 
+  def test_sprawl_limited_expected_total_is_geometric
+    s = Bench::Scenarios.build("sprawl_limited", {})
+    # 100 seeds * (1 + 50 + 50^2) = 255,100
+    assert_equal 255_100, s.expected_total
+    small = Bench::Scenarios.build("sprawl_limited", { "seeds" => "2", "fanout" => "3", "depth" => "1" })
+    assert_equal 8, small.expected_total # 2 * (1 + 3)
+  end
+
   def test_unknown_scenario_raises
     assert_raises(ArgumentError) { Bench::Scenarios.build("nope", {}) }
   end
@@ -71,6 +79,6 @@ class ScenariosTest < Minitest::Test
   end
 
   def test_names
-    assert_equal %w[baseline baseline_limited sprawl], Bench::Scenarios.names
+    assert_equal %w[baseline baseline_limited sprawl sprawl_limited], Bench::Scenarios.names
   end
 end

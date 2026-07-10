@@ -27,6 +27,10 @@ module Bench
       "sprawl" => {
         defaults: { "seeds" => 100, "fanout" => 50, "depth" => 2, "work_ms" => 10 },
         expected: ->(p) { p["seeds"] * (0..p["depth"]).sum { |i| p["fanout"]**i } }
+      },
+      "sprawl_limited" => {
+        defaults: { "seeds" => 100, "fanout" => 50, "depth" => 2, "work_ms" => 10 },
+        expected: ->(p) { p["seeds"] * (0..p["depth"]).sum { |i| p["fanout"]**i } }
       }
     }.freeze
 
