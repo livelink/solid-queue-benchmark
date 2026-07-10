@@ -4,6 +4,7 @@ gem "railties", "~> 8.0.0"
 gem "activerecord", "~> 8.0.0"
 gem "activejob", "~> 8.0.0"
 gem "trilogy"
+gem "pg"
 
 case (sq_source = ENV.fetch("SOLID_QUEUE_SOURCE", "upstream"))
 when "upstream"
