@@ -1,9 +1,13 @@
 # lib/bench/postgres_client.rb
+require "csv"
 require "bench/shell"
 
 module Bench
   class PostgresClient
-    BASE_CMD = (%w[docker compose exec -T postgres psql -U bench -d bench -tA -F] + ["\t", "-c"]).freeze
+    # CSV (not plain tab-separated) because pg_stat_statements' query text can
+    # span multiple lines (e.g. Rails' own multi-line introspection queries) -
+    # a bare newline-per-row split would shred one row into several.
+    BASE_CMD = %w[docker compose exec -T postgres psql -U bench -d bench -t --csv -c].freeze
 
     def initialize(runner: Shell.method(:capture))
       @runner = runner
@@ -11,7 +15,7 @@ module Bench
 
     def query(sql)
       out = @runner.call(BASE_CMD + [sql], env: {})
-      out.split("\n").map { |line| line.split("\t") }
+      CSV.parse(out)
     end
 
     def scalar(sql)

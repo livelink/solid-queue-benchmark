@@ -3,14 +3,20 @@ require "test_helper"
 require "bench/postgres_client"
 
 class PostgresClientTest < Minitest::Test
-  def test_query_parses_tsv_rows
+  def test_query_parses_csv_rows
     fake = lambda do |cmd, env: {}|
-      assert_equal %w[docker compose exec -T postgres psql -U bench -d bench -tA -F] + ["\t", "-c"], cmd[0..-2]
+      assert_equal %w[docker compose exec -T postgres psql -U bench -d bench -t --csv -c], cmd[0..-2]
       assert_equal "SELECT 1, 'a'", cmd.last
-      "1\ta\n2\tb\n"
+      "1,a\n2,b\n"
     end
     client = Bench::PostgresClient.new(runner: fake)
     assert_equal [["1", "a"], ["2", "b"]], client.query("SELECT 1, 'a'")
+  end
+
+  def test_query_handles_multiline_field_values
+    fake = ->(_cmd, env: {}) { "1,\"line1\nline2\",3\n" }
+    client = Bench::PostgresClient.new(runner: fake)
+    assert_equal [["1", "line1\nline2", "3"]], client.query("SELECT 1, 'line1\nline2', 3")
   end
 
   def test_scalar
