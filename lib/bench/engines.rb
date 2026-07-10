@@ -19,7 +19,7 @@ module Bench
     SQL
 
     POSTGRES_DIGEST_FETCH_SQL = <<~SQL.tr("\n", " ").freeze
-      SELECT query, calls, ROUND(total_exec_time, 1), rows
+      SELECT query, calls, ROUND(total_exec_time::numeric, 1), rows
       FROM pg_stat_statements
       WHERE dbid = (SELECT oid FROM pg_database WHERE datname = 'bench')
       ORDER BY total_exec_time DESC
