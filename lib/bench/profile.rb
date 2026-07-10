@@ -46,9 +46,16 @@ module Bench
       }
     end
 
-    # Total solid_queue processes expected to register: supervisor + workers + dispatchers.
-    def expected_process_count
-      1 + workers + dispatchers
+    # Total solid_queue processes expected to register.
+    def expected_process_count(process_launcher: "supervisor")
+      case process_launcher
+      when "supervisor"
+        1 + workers + dispatchers
+      when "direct"
+        workers + dispatchers
+      else
+        raise ArgumentError, "unknown process launcher #{process_launcher.inspect}"
+      end
     end
 
     def to_h

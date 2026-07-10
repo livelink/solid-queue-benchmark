@@ -41,9 +41,9 @@ bin/bench run sprawl --source path:~/Projects/solid_queue
 ```
 
 Each run starts a fresh database volume (MySQL or Postgres, per `--database`; default `mysql`),
-loads schema from the selected gem source, starts the solid_queue supervisor, runs the scenario,
-waits for drain, and writes `results/<run-id>/result.json` plus logs. Results include the
-resolved gem version, the database engine used, and, for `path:` sources, the git SHA.
+loads schema from the selected gem source, starts Solid Queue workers, runs the scenario, waits
+for drain, and writes `results/<run-id>/result.json` plus logs. Results include the resolved gem
+version, the database engine used, the process launcher, and, for `path:` sources, the git SHA.
 
 ## Scenarios
 
@@ -79,6 +79,13 @@ bin/bench run baseline --source upstream --database postgres --profile default
 `bin/bench compare` refuses profile mismatches unless `--force` is passed. Comparing a MySQL run
 against a Postgres run under the same profile is not treated as a mismatch — the report simply
 shows which engine each side used.
+
+By default, the harness uses Solid Queue's fork supervisor. On macOS with Postgres, the harness
+uses `direct` launching instead: each worker and dispatcher is started as a fresh Ruby process to
+avoid the `pg`/libpq crashes seen when forked children connect after Rails has booted. The chosen
+launcher is recorded in `result.json` under `profile.process_launcher`, so mixed launcher
+comparisons are guarded like other topology changes. Override with
+`BENCH_SOLID_QUEUE_LAUNCHER=supervisor` or `BENCH_SOLID_QUEUE_LAUNCHER=direct` when needed.
 
 ## Compare Runs
 

@@ -45,6 +45,11 @@ class ProfileTest < Minitest::Test
     assert_equal 12, p.expected_process_count # 1 supervisor + 10 workers + 1 dispatcher
   end
 
+  def test_expected_process_count_for_direct_launcher
+    p = Bench::Profile.load("default")
+    assert_equal 11, p.expected_process_count(process_launcher: "direct") # 10 workers + 1 dispatcher
+  end
+
   def test_to_h_roundtrips_for_result_json
     p = Bench::Profile.load("default")
     h = p.to_h

@@ -1,6 +1,7 @@
 # lib/bench/runner.rb
 require "json"
 require "fileutils"
+require "rbconfig"
 require "time"
 require "bench/shell"
 require "bench/engines"
@@ -34,19 +35,19 @@ module Bench
         run_id: run_id,
         database: @database,
         scenario: { name: @scenario.name, params: @scenario.params, expected_total: @scenario.expected_total },
-        source: nil, profile: @profile.to_h,
+        source: nil, profile: @profile.to_h.merge(process_launcher: process_launcher),
         status: "failed", error: nil,
         timings: { started_at: started_at.utc.iso8601 }, metrics: {}
       )
       logs = result.logs_dir(results_dir: results_dir)
-      supervisor_pid = nil
+      solid_queue_pids = []
       cpu = depth = nil
 
       begin
         result.source = prepare_source
         db_fresh_start
         db_setup(logs)
-        supervisor_pid = start_supervisor(logs)
+        solid_queue_pids = start_solid_queue_processes(logs)
         wait_for_processes
         @digests.reset
         cpu = CpuSampler.new(container: @engine.container).start
@@ -76,7 +77,7 @@ module Bench
         begin
           cpu&.stop
           depth&.stop
-          stop_supervisor(supervisor_pid) if supervisor_pid
+          stop_processes(solid_queue_pids) if solid_queue_pids.any?
           compose_down
         rescue StandardError => teardown_error
           warn "teardown error (ignored): #{teardown_error.message}"
@@ -98,7 +99,8 @@ module Bench
       {
         "BUNDLE_GEMFILE" => gemfile_path,
         "RAILS_ENV" => "production",
-        "BENCH_DATABASE" => @database
+        "BENCH_DATABASE" => @database,
+        "BENCH_SOLID_QUEUE_LAUNCHER" => process_launcher
       }.merge(@profile.env)
     end
 
@@ -155,29 +157,92 @@ module Bench
 
     # --- processes ---
 
+    def process_launcher
+      @process_launcher ||= begin
+        launcher = ENV.fetch("BENCH_SOLID_QUEUE_LAUNCHER") do
+          postgres_on_macos? ? "direct" : "supervisor"
+        end
+
+        unless %w[supervisor direct].include?(launcher)
+          raise RunFailure, "BENCH_SOLID_QUEUE_LAUNCHER must be supervisor or direct (got #{launcher.inspect})"
+        end
+
+        launcher
+      end
+    end
+
+    def postgres_on_macos?
+      @database == "postgres" && RbConfig::CONFIG.fetch("host_os").include?("darwin")
+    end
+
+    def start_solid_queue_processes(logs)
+      case process_launcher
+      when "supervisor" then [start_supervisor(logs)]
+      when "direct" then start_direct_processes(logs)
+      end
+    end
+
+    def solid_queue_log_path(logs)
+      File.join(logs, "supervisor.log")
+    end
+
     def start_supervisor(logs)
       Shell.spawn_logged(
         Shell.bundle_cmd("exec", *Shell.ruby_cmd("bin/jobs", "start")),
         env: base_env, chdir: harness_dir,
-        log_path: File.join(logs, "supervisor.log")
+        log_path: solid_queue_log_path(logs)
       )
     end
 
-    def stop_supervisor(pid)
-      Process.kill("TERM", pid)
-      60.times do
-        return if Process.waitpid(pid, Process::WNOHANG)
-        sleep 0.5
+    def start_direct_processes(logs)
+      pids = []
+      @profile.dispatchers.times do |i|
+        pids << Shell.spawn_logged(
+          Shell.bundle_cmd("exec", *Shell.ruby_cmd("bin/bench-process", "dispatcher")),
+          env: base_env.merge("BENCH_PROCESS_INDEX" => i.to_s),
+          chdir: harness_dir, log_path: solid_queue_log_path(logs)
+        )
       end
-      Process.kill("KILL", pid) rescue nil
-      Process.waitpid(pid) rescue nil
-    rescue Errno::ESRCH, Errno::ECHILD
-      # already gone
+
+      @profile.workers.times do |i|
+        pids << Shell.spawn_logged(
+          Shell.bundle_cmd("exec", *Shell.ruby_cmd("bin/bench-process", "worker")),
+          env: base_env.merge("BENCH_PROCESS_INDEX" => i.to_s),
+          chdir: harness_dir, log_path: solid_queue_log_path(logs)
+        )
+      end
+
+      pids
+    end
+
+    def stop_processes(pids)
+      pids.each do |pid|
+        Process.kill("TERM", pid)
+      rescue Errno::ESRCH
+        # already gone
+      end
+
+      deadline = Time.now + 60
+      remaining = pids.dup
+      until remaining.empty? || Time.now >= deadline
+        remaining.delete_if do |pid|
+          Process.waitpid(pid, Process::WNOHANG)
+        rescue Errno::ECHILD
+          true
+        end
+        sleep 0.5 if remaining.any?
+      end
+
+      remaining.each do |pid|
+        Process.kill("KILL", pid)
+      rescue Errno::ESRCH
+      end
+      remaining.each { |pid| Process.waitpid(pid) rescue nil }
     end
 
     def wait_for_processes
       deadline = Time.now + 120
-      expected = @profile.expected_process_count
+      expected = @profile.expected_process_count(process_launcher: process_launcher)
       loop do
         count = @db.scalar("SELECT COUNT(*) FROM solid_queue_processes").to_i
         return if count >= expected
