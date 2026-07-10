@@ -7,7 +7,7 @@ ruby = "3.3"
 PATH = "{{env.HOME}}/.local/share/mise/shims:{{env.PATH}}"
 
 [tasks.setup]
-description = "Install gems for the default (upstream) source and pull the MySQL image"
+description = "Install gems for the default (upstream) source and pull the MySQL and Postgres images"
 run = "mise exec -- ruby bin/bench setup"
 
 [tasks.bench]

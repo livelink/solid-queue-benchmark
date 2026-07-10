@@ -1,0 +1,35 @@
+#!/usr/bin/env ruby
+require_relative "../config/environment"
+
+require "solid_queue/dispatcher"
+require "solid_queue/worker"
+
+STDOUT.sync = STDERR.sync = true
+
+role = ARGV.first
+process = case role
+when "dispatcher"
+  SolidQueue::Dispatcher.new(
+    polling_interval: 1,
+    batch_size: 500,
+    concurrency_maintenance_interval: 30
+  )
+when "worker"
+  SolidQueue::Worker.new(
+    queues: "*",
+    threads: ENV.fetch("BENCH_WORKER_THREADS", 2).to_i,
+    polling_interval: ENV.fetch("BENCH_POLLING_INTERVAL", 0.1).to_f
+  )
+else
+  abort "usage: bin/bench-process worker|dispatcher"
+end
+
+process.mode = :async
+%w[TERM INT].each do |signal|
+  Signal.trap(signal) { process.stop }
+end
+
+puts "SolidQueue direct #{role} starting pid=#{Process.pid} index=#{ENV["BENCH_PROCESS_INDEX"]}"
+process.start
+sleep 0.5 while process.alive?
+puts "SolidQueue direct #{role} stopped pid=#{Process.pid} index=#{ENV["BENCH_PROCESS_INDEX"]}"

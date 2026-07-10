@@ -16,6 +16,25 @@ class CliTest < Minitest::Test
     assert_equal 60, opts[:timeout]
     assert_equal 2, opts[:repeat]
     assert opts[:allow_dirty]
+    assert_equal "mysql", opts[:database]
+  end
+
+  def test_parse_run_options_accepts_postgres_database
+    opts = Bench::CLI.parse_run_options(%w[baseline --source upstream --database postgres])
+    assert_equal "postgres", opts[:database]
+  end
+
+  def test_parse_run_options_accepts_db_resource_overrides
+    opts = Bench::CLI.parse_run_options(%w[baseline --source upstream --db-cpus 2 --db-memory 2g])
+    assert_equal 2.0, opts[:overrides][:db_cpus]
+    assert_equal "2g", opts[:overrides][:db_memory]
+  end
+
+  def test_rejects_unknown_database
+    err = assert_raises(ArgumentError) do
+      Bench::CLI.parse_run_options(%w[baseline --source upstream --database oracle])
+    end
+    assert_includes err.message, "oracle"
   end
 
   def test_run_requires_scenario_and_source
