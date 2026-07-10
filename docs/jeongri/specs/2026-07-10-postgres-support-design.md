@@ -130,6 +130,14 @@ to the engine the run actually selected.
 `gem "trilogy"`. Both adapter gems are always bundled; which one is actually used is
 determined at runtime by `database.yml`.
 
+Unlike `trilogy` (pure Ruby), `pg` has a native extension that links against `libpq` at
+`bundle install` time. `Runner#prepare_source` runs `bundle install`/`check` on the host
+(via `Shell.capture`, not inside a container), so the host needs `libpq` dev headers
+(e.g. `libpq-dev` on Debian/Ubuntu, `postgresql` via Homebrew on macOS) installed before
+`mise run setup` or any `bin/bench` run — this is a new host prerequisite, not just a
+Docker image, and must be called out in `README.md`'s prerequisites section alongside
+the existing Docker/mise ones.
+
 **`harness/script/db_setup.rb`** — branches on
 `ActiveRecord::Base.connection.adapter_name`:
 
@@ -157,8 +165,9 @@ written to project columns in that order:
 - Postgres fetch SQL: `SELECT query, calls, ROUND(total_exec_time, 1), rows FROM
   pg_stat_statements WHERE dbid = (SELECT oid FROM pg_database WHERE datname = 'bench')
   ORDER BY total_exec_time DESC LIMIT 20` (Postgres's `total_exec_time` is already in
-  milliseconds, unlike MySQL's nanosecond `SUM_TIMER_WAIT`, but `Digests` doesn't care
-  about units — it just maps columns positionally).
+  milliseconds, unlike MySQL's picosecond `SUM_TIMER_WAIT` (hence the existing `/1e9`
+  conversion in the MySQL fetch SQL), but `Digests` doesn't care about units — it just
+  maps columns positionally).
 - Postgres reset SQL: `SELECT pg_stat_statements_reset()`.
 
 This is a minor generalization of an existing class, not a new pattern — `Digests`
@@ -204,7 +213,14 @@ supplied by the caller instead of hardcoded.
   against `Engines.names`, raising `ArgumentError` for anything else (same style as the
   existing scenario/source validation).
 - `--mysql-cpus`/`--mysql-memory` flags renamed to `--db-cpus`/`--db-memory`.
-- `run`'s per-iteration header line includes the engine name.
+- `run`'s per-iteration header line includes the engine name, and its
+  `profile.mysql_cpus`/hardcoded `"mysql"` reference (`CLI.run`, currently
+  `" (#{profile.workers}w x #{profile.threads}t, mysql #{profile.mysql_cpus}cpu)"`)
+  updates to `profile.db_cpus` and the selected engine name instead of the literal
+  string `"mysql"`.
+- `list`'s per-result CPU column (currently `metrics.dig("mysql_cpu", "avg_pct")`)
+  updates to `metrics.dig("db_cpu", "avg_pct")` — otherwise it silently reads a key that
+  no longer exists in new result files and always prints `-` with no error.
 - `setup` pulls both images unconditionally: `docker compose pull mysql postgres`.
 - Usage text documents `--database mysql|postgres`.
 
@@ -220,8 +236,15 @@ supplied by the caller instead of hardcoded.
   avg (%)" → "DB CPU avg (%)", chart title "MySQL CPU %" → "DB CPU %".
 
 **`README.md`** — documents the `--database` flag, lists Postgres as a second
-prerequisite (Docker image, pulled automatically by `setup`), and updates the metrics
-section for the renamed fields.
+prerequisite (Docker image, pulled automatically by `setup`, plus the host `libpq` dev
+headers noted above), and updates the metrics section for the renamed fields. This
+includes correcting the existing MySQL-only prerequisite/architecture lines ("Docker for
+MySQL 8.0", "Workers run on the host. Only MySQL is containerized.") rather than just
+adding a Postgres bullet alongside them.
+
+**`mise.toml`** — the `setup` task's description ("Install gems for the default
+(upstream) source and pull the MySQL image") updates to reflect that it now pulls both
+images.
 
 ## Error handling
 
