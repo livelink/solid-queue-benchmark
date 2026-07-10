@@ -27,6 +27,9 @@ class EnginesTest < Minitest::Test
     assert_equal 15432, engine.default_port
     assert_includes engine.digest_fetch_sql, "pg_stat_statements"
     assert_includes engine.digest_reset_sql, "pg_stat_statements_reset"
+    # Postgres has no ROUND(double precision, integer) overload, only ROUND(numeric, integer) -
+    # regression guard for a bug only caught by a live Postgres run (see engines.rb history).
+    assert_includes engine.digest_fetch_sql, "total_exec_time::numeric"
   end
 
   def test_fetch_unknown_raises
