@@ -7,9 +7,11 @@ reports.
 ## Prerequisites
 
 - [mise](https://mise.jdx.dev) for the pinned Ruby version
-- Docker for MySQL 8.0
+- Docker for MySQL 8.0 and Postgres 16
+- `libpq` dev headers on the host, to compile the `pg` gem's native extension
+  (`libpq-dev` on Debian/Ubuntu, `postgresql` via Homebrew on macOS)
 
-Workers run on the host. Only MySQL is containerized.
+Workers run on the host. Only the database (MySQL or Postgres) is containerized.
 
 ## Setup
 
@@ -20,13 +22,16 @@ mise run setup
 
 If mise reports that `mise.toml` is not trusted, run `mise trust` once in the checkout, then retry.
 
-`setup` bundles the default upstream source and pulls the MySQL image.
+`setup` bundles the default upstream source and pulls both the MySQL and Postgres images.
 
 ## Run a Benchmark
 
 ```sh
-# latest official gem
+# latest official gem, against MySQL (default)
 bin/bench run baseline --source upstream
+
+# same run against Postgres, for a like-for-like comparison
+bin/bench run baseline --source upstream --database postgres
 
 # pinned RubyGems release
 bin/bench run baseline --source upstream@1.2.4
@@ -35,10 +40,10 @@ bin/bench run baseline --source upstream@1.2.4
 bin/bench run sprawl --source path:~/Projects/solid_queue
 ```
 
-Each run starts a fresh MySQL volume, loads schema from the selected gem source, starts the
-solid_queue supervisor, runs the scenario, waits for drain, and writes
-`results/<run-id>/result.json` plus logs. Results include the resolved gem version and, for
-`path:` sources, the git SHA.
+Each run starts a fresh database volume (MySQL or Postgres, per `--database`; default `mysql`),
+loads schema from the selected gem source, starts the solid_queue supervisor, runs the scenario,
+waits for drain, and writes `results/<run-id>/result.json` plus logs. Results include the
+resolved gem version, the database engine used, and, for `path:` sources, the git SHA.
 
 ## Scenarios
 
@@ -59,17 +64,21 @@ bin/bench run sprawl --source path:~/Projects/solid_queue --set seeds=5 --set fa
 
 ## Profiles and Topology
 
-Profiles live in `profiles/*.yml` and bundle MySQL resources with worker topology so comparisons
-stay comparable. The default profile uses MySQL pinned to 1 CPU / 1 GB, 10 worker processes x 2
-threads, and 1 dispatcher.
+Profiles live in `profiles/*.yml` and bundle database resource limits with worker topology so
+comparisons stay comparable, independent of which engine a run targets. The default profile
+pins the database container to 1 CPU / 1 GB, with 10 worker processes x 2 threads and 1
+dispatcher.
 
 ```sh
 bin/bench run baseline --source upstream --profile default
 bin/bench run baseline --source upstream --profile smoke
-bin/bench run baseline --source upstream --workers 50 --mysql-cpus 2 --mysql-memory 2g
+bin/bench run baseline --source upstream --workers 50 --db-cpus 2 --db-memory 2g
+bin/bench run baseline --source upstream --database postgres --profile default
 ```
 
-`bin/bench compare` refuses profile mismatches unless `--force` is passed.
+`bin/bench compare` refuses profile mismatches unless `--force` is passed. Comparing a MySQL run
+against a Postgres run under the same profile is not treated as a mismatch — the report simply
+shows which engine each side used.
 
 ## Compare Runs
 
@@ -78,8 +87,9 @@ bin/bench list
 bin/bench compare results/<A>/result.json results/<B>/result.json
 ```
 
-Reports are written to `reports/<A>__vs__<B>/report.md` and `report.html`. They include metric
-deltas, MySQL CPU and ready-depth overlay charts, and top SQL statements by total database time.
+Reports are written to `reports/<A>__vs__<B>/report.md` and `report.html`. They include which
+database engine each run used, metric deltas, DB CPU and ready-depth overlay charts, and top SQL
+statements by total database time.
 
 Use `--force` only when you intentionally want to compare different profiles:
 
@@ -99,9 +109,9 @@ Repeats keep every raw result and print median throughput across completed runs.
 
 - Throughput, including a per-second series
 - Latency percentiles for enqueue-to-start and enqueue-to-finish
-- MySQL container CPU samples from `docker stats`
+- Database container CPU samples from `docker stats`
 - Queue depth samples for ready, scheduled, claimed, blocked, failed, and completed jobs
-- Top statement digests from MySQL `performance_schema`
+- Top statement digests from MySQL `performance_schema` or Postgres `pg_stat_statements`
 
 ## Adding a Scenario
 
