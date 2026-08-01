@@ -1,9 +1,14 @@
 # harness/script/db_setup.rb
 db_config = ActiveRecord::Base.connection_db_config.configuration_hash
+adapter_name = ActiveRecord::Base.connection.adapter_name
 
-ActiveRecord::Base.establish_connection(db_config.merge(database: nil))
-ActiveRecord::Base.connection.execute("CREATE DATABASE IF NOT EXISTS #{db_config[:database]}")
-ActiveRecord::Base.establish_connection(db_config)
+if adapter_name == "PostgreSQL"
+  ActiveRecord::Base.connection.execute("CREATE EXTENSION IF NOT EXISTS pg_stat_statements")
+else
+  ActiveRecord::Base.establish_connection(db_config.merge(database: nil))
+  ActiveRecord::Base.connection.execute("CREATE DATABASE IF NOT EXISTS #{db_config[:database]}")
+  ActiveRecord::Base.establish_connection(db_config)
+end
 
 gem_path = Gem.loaded_specs["solid_queue"].full_gem_path
 schema_candidates = [

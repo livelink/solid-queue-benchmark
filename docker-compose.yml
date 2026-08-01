@@ -8,12 +8,30 @@ services:
       MYSQL_ROOT_PASSWORD: bench
       MYSQL_DATABASE: bench
     command: --performance-schema=ON --max-connections=500
-    cpus: "${BENCH_MYSQL_CPUS:-1.0}"
-    mem_limit: "${BENCH_MYSQL_MEMORY:-1g}"
+    cpus: "${BENCH_DB_CPUS:-1.0}"
+    mem_limit: "${BENCH_DB_MEMORY:-1g}"
     ports:
       - "127.0.0.1:${BENCH_MYSQL_PORT:-13306}:3306"
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-pbench"]
+      interval: 2s
+      timeout: 2s
+      retries: 60
+
+  postgres:
+    image: postgres:16
+    container_name: sq-bench-postgres
+    environment:
+      POSTGRES_USER: bench
+      POSTGRES_PASSWORD: bench
+      POSTGRES_DB: bench
+    command: postgres -c shared_preload_libraries=pg_stat_statements -c max_connections=500
+    cpus: "${BENCH_DB_CPUS:-1.0}"
+    mem_limit: "${BENCH_DB_MEMORY:-1g}"
+    ports:
+      - "127.0.0.1:${BENCH_POSTGRES_PORT:-15432}:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "bench"]
       interval: 2s
       timeout: 2s
       retries: 60

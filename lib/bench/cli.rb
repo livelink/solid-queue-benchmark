@@ -4,6 +4,7 @@ require "optparse"
 require "bench/source_spec"
 require "bench/profile"
 require "bench/scenarios"
+require "bench/engines"
 
 module Bench
   module CLI
@@ -32,10 +33,11 @@ module Bench
           run <scenario> --source <src> [options]   Run a benchmark
           compare <result.json> <result.json>       Compare two runs
           list                                      List past runs
-          setup                                     Bundle default source + pull MySQL image
+          setup                                     Bundle default source + pull database images
 
         Scenarios: #{Scenarios.names.join(", ")}
         Sources:   upstream | upstream@1.2.4 | path:/dir/of/solid_queue
+        Databases: #{Engines.names.join(" | ")} (default: mysql)
       USAGE
     end
 
@@ -46,11 +48,13 @@ module Bench
         overrides: {},
         timeout: 900,
         repeat: 1,
-        allow_dirty: false
+        allow_dirty: false,
+        database: "mysql"
       }
       parser = OptionParser.new do |o|
         o.on("--source SRC") { |v| opts[:source] = v }
         o.on("--profile NAME") { |v| opts[:profile] = v }
+        o.on("--database ENGINE") { |v| opts[:database] = v }
         o.on("--set KEY=VAL", "Scenario param override (repeatable)") do |v|
           key, value = v.split("=", 2)
           raise ArgumentError, "--set must be KEY=VAL" if key.nil? || key.empty? || value.nil?
@@ -58,8 +62,8 @@ module Bench
         end
         o.on("--workers N", Integer) { |v| opts[:overrides][:workers] = v }
         o.on("--threads N", Integer) { |v| opts[:overrides][:threads] = v }
-        o.on("--mysql-cpus N", Float) { |v| opts[:overrides][:mysql_cpus] = v }
-        o.on("--mysql-memory SIZE") { |v| opts[:overrides][:mysql_memory] = v }
+        o.on("--db-cpus N", Float) { |v| opts[:overrides][:db_cpus] = v }
+        o.on("--db-memory SIZE") { |v| opts[:overrides][:db_memory] = v }
         o.on("--timeout SECONDS", Integer) { |v| opts[:timeout] = v }
         o.on("--repeat N", Integer) { |v| opts[:repeat] = v }
         o.on("--allow-dirty") { opts[:allow_dirty] = true }
@@ -69,6 +73,9 @@ module Bench
       raise ArgumentError, "scenario required (#{Scenarios.names.join(", ")})" unless opts[:scenario]
       raise ArgumentError, "--source required" unless opts[:source]
       raise ArgumentError, "--repeat must be >= 1" if opts[:repeat] < 1
+      unless Engines.names.include?(opts[:database])
+        raise ArgumentError, "--database must be one of #{Engines.names.join(", ")} (got #{opts[:database].inspect})"
+      end
       opts
     end
 
@@ -80,13 +87,14 @@ module Bench
       profile = Profile.load(opts[:profile], opts[:overrides])
 
       results = opts[:repeat].times.map do |i|
-        puts "== run #{i + 1}/#{opts[:repeat]}: #{scenario.name} | #{source} | profile #{profile.name}" \
-             " (#{profile.workers}w x #{profile.threads}t, mysql #{profile.mysql_cpus}cpu)"
+        puts "== run #{i + 1}/#{opts[:repeat]}: #{scenario.name} | #{source} | #{opts[:database]} | profile #{profile.name}" \
+             " (#{profile.workers}w x #{profile.threads}t, #{opts[:database]} #{profile.db_cpus}cpu)"
         Runner.new(
           scenario: scenario,
           source: source,
           profile: profile,
           root: ROOT,
+          database: opts[:database],
           timeout: opts[:timeout],
           allow_dirty: opts[:allow_dirty]
         ).call
@@ -115,7 +123,7 @@ module Bench
           data["run_id"],
           data["status"],
           metrics["throughput_jobs_per_sec"] || "-",
-          metrics.dig("mysql_cpu", "avg_pct") || "-"
+          metrics.dig("db_cpu", "avg_pct") || "-"
         )
       end
     end
@@ -128,7 +136,7 @@ module Bench
       gemfile = File.join(ROOT, "gemfiles", "#{source.key}.gemfile")
       File.write(gemfile, source.wrapper_gemfile_contents)
       Shell.capture(Shell.bundle_cmd("install"), env: { "BUNDLE_GEMFILE" => gemfile })
-      Shell.capture(%w[docker compose pull mysql])
+      Shell.capture(%w[docker compose pull mysql postgres])
       puts "setup: ok"
     end
 

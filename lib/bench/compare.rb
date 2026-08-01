@@ -15,8 +15,8 @@ module Bench
       ["Enqueue to start p99 (ms)", ->(m) { m.dig("latency_ms", "enqueue_to_start", "p99") }, :lower_better],
       ["Enqueue to finish p95 (ms)", ->(m) { m.dig("latency_ms", "enqueue_to_finish", "p95") }, :lower_better],
       ["Enqueue to finish p99 (ms)", ->(m) { m.dig("latency_ms", "enqueue_to_finish", "p99") }, :lower_better],
-      ["MySQL CPU avg (%)", ->(m) { m.dig("mysql_cpu", "avg_pct") }, :lower_better],
-      ["MySQL CPU max (%)", ->(m) { m.dig("mysql_cpu", "max_pct") }, :lower_better]
+      ["DB CPU avg (%)", ->(m) { m.dig("db_cpu", "avg_pct") }, :lower_better],
+      ["DB CPU max (%)", ->(m) { m.dig("db_cpu", "max_pct") }, :lower_better]
     ].freeze
 
     module_function
@@ -44,6 +44,7 @@ module Bench
       lines << "| | A | B |"
       lines << "|---|---|---|"
       lines << "| Run | #{a.run_id} | #{b.run_id} |"
+      lines << "| Database | #{a.database} | #{b.database} |"
       lines << "| Source | #{source_label(a)} | #{source_label(b)} |"
       lines << "| Scenario | #{scenario_label(a)} | #{scenario_label(b)} |"
       lines << "| Profile | #{a.profile} | #{b.profile} |"
@@ -67,11 +68,11 @@ module Bench
     def render_html(a, b, force:)
       warning = check_profiles!(a, b, force: force)
       cpu_chart = SvgChart.line_chart(
-        title: "MySQL CPU %",
-        y_label: "MySQL CPU %",
+        title: "DB CPU %",
+        y_label: "DB CPU %",
         series: [
-          { label: "A: #{a.source["spec"]}", color: "#2563eb", points: normalize_series(a.metrics.dig("mysql_cpu", "series"), "cpu_pct") },
-          { label: "B: #{b.source["spec"]}", color: "#dc2626", points: normalize_series(b.metrics.dig("mysql_cpu", "series"), "cpu_pct") }
+          { label: "A: #{a.source["spec"]}", color: "#2563eb", points: normalize_series(a.metrics.dig("db_cpu", "series"), "cpu_pct") },
+          { label: "B: #{b.source["spec"]}", color: "#dc2626", points: normalize_series(b.metrics.dig("db_cpu", "series"), "cpu_pct") }
         ]
       )
       depth_chart = SvgChart.line_chart(
@@ -97,7 +98,7 @@ module Bench
         </style>
         <h1>solid_queue benchmark comparison</h1>
         #{warning ? %(<p class="warning"><strong>#{h(warning).gsub("\n", "<br>")}</strong></p>) : ""}
-        <h2>MySQL CPU over time</h2>
+        <h2>DB CPU over time</h2>
         #{cpu_chart}
         <h2>Ready queue depth over time</h2>
         #{depth_chart}

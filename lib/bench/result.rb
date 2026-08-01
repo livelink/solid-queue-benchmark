@@ -6,7 +6,7 @@ module Bench
   # Nested hashes are symbol-keyed when freshly built via .new,
   # string-keyed after .load — don't mix access styles.
   class Result
-    FIELDS = %i[run_id scenario source profile status error timings metrics].freeze
+    FIELDS = %i[run_id database scenario source profile status error timings metrics].freeze
     attr_accessor(*FIELDS)
 
     def initialize(**attrs)

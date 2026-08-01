@@ -1,8 +1,18 @@
+<% engine = ENV.fetch("BENCH_DATABASE", "mysql") %>
 production:
+<% if engine == "postgres" %>
+  adapter: postgresql
+  host: 127.0.0.1
+  port: <%= ENV.fetch("BENCH_POSTGRES_PORT", 15432).to_i %>
+  username: bench
+  password: bench
+  database: bench
+<% else %>
   adapter: trilogy
   host: 127.0.0.1
   port: <%= ENV.fetch("BENCH_MYSQL_PORT", 13306).to_i %>
   username: root
   password: bench
   database: bench
+<% end %>
   pool: <%= ENV.fetch("BENCH_WORKER_THREADS", 2).to_i + 3 %>

@@ -3,11 +3,11 @@ require "yaml"
 
 module Bench
   class Profile
-    ATTRS = %i[name mysql_cpus mysql_memory workers threads polling_interval dispatchers].freeze
+    ATTRS = %i[name db_cpus db_memory workers threads polling_interval dispatchers].freeze
     attr_reader(*ATTRS)
 
     # name_or_path: a bare profile name resolved under profiles/, or a path to a yml.
-    # overrides: {workers:, threads:, mysql_cpus:, mysql_memory:} from CLI flags.
+    # overrides: {workers:, threads:, db_cpus:, db_memory:} from CLI flags.
     def self.load(name_or_path, overrides = {})
       path = if name_or_path.include?("/") || name_or_path.end_with?(".yml")
         File.expand_path(name_or_path)
@@ -17,8 +17,8 @@ module Bench
       raw = YAML.safe_load_file(path) || {}
       new(
         name: File.basename(path, ".yml"),
-        mysql_cpus: (overrides[:mysql_cpus] || raw.dig("mysql", "cpus") || 1.0).to_f,
-        mysql_memory: (overrides[:mysql_memory] || raw.dig("mysql", "memory") || "1g").to_s,
+        db_cpus: (overrides[:db_cpus] || raw.dig("db", "cpus") || 1.0).to_f,
+        db_memory: (overrides[:db_memory] || raw.dig("db", "memory") || "1g").to_s,
         workers: (overrides[:workers] || raw.dig("workers", "count") || 10).to_i,
         threads: (overrides[:threads] || raw.dig("workers", "threads") || 2).to_i,
         polling_interval: (raw.dig("workers", "polling_interval") || 0.1).to_f,
@@ -26,10 +26,10 @@ module Bench
       )
     end
 
-    def initialize(name:, mysql_cpus:, mysql_memory:, workers:, threads:, polling_interval:, dispatchers:)
+    def initialize(name:, db_cpus:, db_memory:, workers:, threads:, polling_interval:, dispatchers:)
       @name = name
-      @mysql_cpus = mysql_cpus
-      @mysql_memory = mysql_memory
+      @db_cpus = db_cpus
+      @db_memory = db_memory
       @workers = workers
       @threads = threads
       @polling_interval = polling_interval
@@ -38,17 +38,24 @@ module Bench
 
     def env
       {
-        "BENCH_MYSQL_CPUS" => mysql_cpus.to_s,
-        "BENCH_MYSQL_MEMORY" => mysql_memory,
+        "BENCH_DB_CPUS" => db_cpus.to_s,
+        "BENCH_DB_MEMORY" => db_memory,
         "BENCH_WORKER_PROCESSES" => workers.to_s,
         "BENCH_WORKER_THREADS" => threads.to_s,
         "BENCH_POLLING_INTERVAL" => polling_interval.to_s
       }
     end
 
-    # Total solid_queue processes expected to register: supervisor + workers + dispatchers.
-    def expected_process_count
-      1 + workers + dispatchers
+    # Total solid_queue processes expected to register.
+    def expected_process_count(process_launcher: "supervisor")
+      case process_launcher
+      when "supervisor"
+        1 + workers + dispatchers
+      when "direct"
+        workers + dispatchers
+      else
+        raise ArgumentError, "unknown process launcher #{process_launcher.inspect}"
+      end
     end
 
     def to_h
